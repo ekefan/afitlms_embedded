@@ -4,17 +4,12 @@
 #include "DisplayManager.h"
 #include "RFIDManager.h"
 #include "NetworkManager.h"
-#include "DataStore.h"
-#include "KeypadManager.h"
 
 enum class AttendanceState
 {
-    SELECT_FACULTY,
-    SELECT_LEVEL,
-    SELECT_DEPARTMENT,
     SELECT_COURSE_CODE,
-    READY,
-    TAKING_ATTENDANCE
+    WAITING_FOR_ATTENDANCE_DATA,
+    TAKING_ATTENDANCE,
 };
 
 class AttendanceHandler
@@ -23,17 +18,20 @@ private:
     DisplayManager &display;
     RFIDManager &rfid;
     NetworkManager &network;
-    KeypadManager &keypad;
     DataStore &data;
+    ModeManager &mode;
 
     AttendanceState state;
     int selectedCourseCodes;
 
 public:
-    AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, KeypadManager &kpm);
+    AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, ModeManager &mm);
     void selectCourseFilters(char key);
     void checkCard();
+    AttendanceState getState();
     void displayFilters();
+    void loop();
+    void fetchAttendanceData();
 };
 
 #endif

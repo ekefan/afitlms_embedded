@@ -4,6 +4,7 @@ ModeManager::ModeManager()
 {
     currentMode = SystemMode::ATTENDANCE;
     promptActive = false;
+    attendanceActive = false;
 }
 
 void ModeManager::requestModeChange(SystemMode newMode)
@@ -27,4 +28,15 @@ SystemMode ModeManager::getMode() const
 bool ModeManager::isPrompting() const
 {
     return promptActive;
+}
+
+bool ModeManager::isTakingAttendance() const
+{
+    return attendanceActive;
+}
+
+void ModeManager::setAttendanceModeChange(SystemMode newMode)
+{
+    currentMode = newMode;
+    attendanceActive = true;
 }

@@ -3,7 +3,6 @@
 #include "KeypadManager.h"
 #include "DisplayManager.h"
 #include "RFIDManager.h"
-#include "NetworkManager.h"
 #include "EnrollmentHandler.h"
 #include "AttendanceHandler.h"
 #include "DataStore.h"
@@ -13,13 +12,13 @@
 #define MQTT_SERVER_IP "192.168.149.187" // Your Windows IP
 #define MQTT_SERVER_PORT 1883
 ModeManager modeManager;
-KeypadManager keypadManager;
 DisplayManager displayManager;
 DataStore dataStore;
-RFIDManager rfid(5, 17);                                  // SDA, RST
-NetworkManager network(MQTT_SERVER_IP, MQTT_SERVER_PORT); // Replace with your MQTT broker
+RFIDManager rfid(5, 17);                                             // SDA, RST
+NetworkManager network(MQTT_SERVER_IP, MQTT_SERVER_PORT, dataStore); // Replace with your MQTT broker
 EnrollmentHandler enrollment(rfid, network, displayManager);
-AttendanceHandler attendance(displayManager, rfid, network, dataStore, keypadManager);
+AttendanceHandler attendance(displayManager, rfid, network, dataStore, modeManager);
+KeypadManager keypadManager(attendance);
 
 void mqttCallBack(char *topic, uint8_t *payload, unsigned int length)
 {
@@ -50,19 +49,19 @@ void setup()
 
 void loop()
 {
-
   keypadManager.handleModeChange(modeManager);
   displayManager.showMode(modeManager.getMode(), modeManager.isPrompting());
   network.loop();
+  attendance.loop();
+
   if ((modeManager.getMode() == SystemMode::ENROLLMENT) && !modeManager.isPrompting())
   {
     displayManager.setScreen(DisplayScreen::ENROLLMENT);
     enrollment.update();
   }
-  if ((modeManager.getMode() == SystemMode::ATTENDANCE) && !modeManager.isPrompting())
+  if ((modeManager.getMode() == SystemMode::ATTENDANCE) && !modeManager.isPrompting() && !modeManager.isTakingAttendance())
   {
     displayManager.setScreen(DisplayScreen::ATTENDANCE_FILTERS);
     attendance.displayFilters();
   }
-  delay(100);
 }

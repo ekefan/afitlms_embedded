@@ -5,7 +5,6 @@ enum class SystemMode
 {
     ATTENDANCE,
     ENROLLMENT,
-    NONE,
 };
 
 class ModeManager
@@ -13,6 +12,7 @@ class ModeManager
 private:
     SystemMode currentMode;
     bool promptActive;
+    bool attendanceActive;
     SystemMode requestedMode;
 
 public:
@@ -22,6 +22,8 @@ public:
     void confirmChange(bool accept);
     SystemMode getMode() const;
     bool isPrompting() const;
+    bool isTakingAttendance() const;
+    void setAttendanceModeChange(SystemMode newMode);
 };
 
 #endif

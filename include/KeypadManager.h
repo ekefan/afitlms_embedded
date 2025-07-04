@@ -3,15 +3,17 @@
 
 #include <Keypad.h>
 #include "ModeManager.h"
+#include "AttendanceHandler.h"
 
 class KeypadManager
 {
 private:
     Keypad keypad;
     String typedText;
+    AttendanceHandler &attendance;
 
 public:
-    KeypadManager();
+    KeypadManager(AttendanceHandler &ah);
     void handleModeChange(ModeManager &modeManager);
     char getKeyFromKeypad();
 };

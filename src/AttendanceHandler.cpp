@@ -1,11 +1,14 @@
 #include "AttendanceHandler.h"
 
-AttendanceHandler::AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, KeypadManager &kpm)
-    : display(d), rfid(r), network(n), data(ds), keypad(kpm), state(AttendanceState::SELECT_FACULTY), selectedCourseCodes(-1) {}
+const char *ATTENDANCE_REQUEST_TOPIC = "attendance/request";
+String ATTENDANCE_RESPONSE_TOPIC_PREFIX = "attendance/response/";
+
+AttendanceHandler::AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, ModeManager &mm)
+    : display(d), rfid(r), network(n), data(ds), mode(mm), state(AttendanceState::SELECT_COURSE_CODE), selectedCourseCodes(-1) {}
 
 void AttendanceHandler::selectCourseFilters(char key)
 {
-    if (key >= '1' && key <= '4')
+    if (key >= '1' && key <= '4' && state == AttendanceState::TAKING_ATTENDANCE)
     {
         int index = key - '1';
         if (index < data.courseCodes.size())
@@ -14,7 +17,10 @@ void AttendanceHandler::selectCourseFilters(char key)
         }
         String courseCode = data.courseCodes[selectedCourseCodes];
         display.setScreen(DisplayScreen::MESSAGE);
-        display.showMessage("Ready to take attendance for lecture");
+        display.showMessage("Ready for attendance");
+        delay(2000);
+        display.showMessageAtPos(30, 45, courseCode.c_str());
+        fetchAttendanceData();
     }
 }
 
@@ -23,17 +29,18 @@ void AttendanceHandler::checkCard()
     if (state == AttendanceState::TAKING_ATTENDANCE && rfid.isCardPresent())
     {
         String uid = rfid.readUID();
-        Student *student = data.findStudent(uid);
+        LectureParticipants *student = data.findStudent(uid);
         if (student)
         {
             data.markPresent(uid);
-            display.showMessage((student->name + " " + student->matric).c_str());
+            display.clear();
+            display.showMessage((student->name + " " + student->uniqueId).c_str());
             delay(1500);
         }
         else
         {
             display.showMessage("Unknown card");
-            delay(1500);
+            delay(3000);
         }
     }
 }
@@ -50,5 +57,42 @@ void AttendanceHandler::displayFilters()
             display.drawLine(i, label);
         }
     }
-    selectCourseFilters(keypad.getKeyFromKeypad());
+    state = AttendanceState::TAKING_ATTENDANCE;
+}
+
+AttendanceState AttendanceHandler::getState()
+{
+    return state;
+}
+
+void AttendanceHandler::fetchAttendanceData()
+{
+    String courseCode = data.courseCodes[selectedCourseCodes];
+    String responseTopic = ATTENDANCE_RESPONSE_TOPIC_PREFIX + courseCode;
+
+    network.publish(ATTENDANCE_REQUEST_TOPIC, courseCode);
+
+    network.subscribe(responseTopic.c_str());
+
+    display.setScreen(DisplayScreen::MESSAGE);
+    display.showMessageAtPos(30, 45, "Fetching data...");
+    delay(5000);
+
+    state = AttendanceState::WAITING_FOR_ATTENDANCE_DATA;
+}
+
+void AttendanceHandler::loop()
+{
+    if (state == AttendanceState::WAITING_FOR_ATTENDANCE_DATA && data.ready)
+    {
+        display.clear();
+        display.showMessageAtPos(30, 45, "Scan your cards");
+        delay(2000);
+        state = AttendanceState::TAKING_ATTENDANCE;
+    }
+
+    if (state == AttendanceState::TAKING_ATTENDANCE)
+    {
+        checkCard();
+    }
 }

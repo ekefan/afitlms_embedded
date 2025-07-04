@@ -10,12 +10,13 @@ char keys[ROWS][COLS] = {
 byte rowPins[ROWS] = {32, 33, 25, 26};
 byte colPins[COLS] = {27, 14, 12, 13};
 
-KeypadManager::KeypadManager()
-    : keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS), typedText("") {}
+KeypadManager::KeypadManager(AttendanceHandler &ah)
+    : attendance(ah), keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS), typedText("") {}
 
 void KeypadManager::handleModeChange(ModeManager &modeManager)
 {
     char key = keypad.getKey();
+    bool flag = false;
 
     if (key)
     {
@@ -45,12 +46,19 @@ void KeypadManager::handleModeChange(ModeManager &modeManager)
         {
             if (key == '1')
             {
+                flag = true;
                 modeManager.confirmChange(true);
             }
             else if (key == '0')
             {
                 modeManager.confirmChange(false);
             }
+        }
+
+        if (attendance.getState() == AttendanceState::TAKING_ATTENDANCE && !flag)
+        {
+            Serial.print("on start it is...");
+            attendance.selectCourseFilters(key);
         }
     }
 }

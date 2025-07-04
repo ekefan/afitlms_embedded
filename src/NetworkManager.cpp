@@ -1,7 +1,8 @@
 #include "NetworkManager.h"
+#include <ArduinoJson.h>
 
-NetworkManager::NetworkManager(const char *server, int port)
-    : mqttClient(wifiClient), mqttServer(server), mqttPort(port), connected(false) {}
+NetworkManager::NetworkManager(const char *server, int port, DataStore &ds)
+    : mqttClient(wifiClient), mqttServer(server), mqttPort(port), data(ds), connected(false) {}
 
 void NetworkManager::begin(const char *ssid, const char *password)
 {
@@ -46,6 +47,33 @@ void NetworkManager::begin(const char *ssid, const char *password)
         Serial.println("❌ failed to connect to MQTT.");
         connected = false;
     }
+
+    mqttClient.setCallback([this](char *topic, byte *payload, unsigned int length)
+                           {
+        String message;
+        for (unsigned int i = 0; i < length; i++){
+            message += (char)payload[i];
+        } 
+        if (String(topic).startsWith("attendance/response/")) {
+            JsonDocument doc = StaticJsonDocument<1024>();
+            DeserializationError err = deserializeJson(doc, message);
+            if (err) {
+                Serial.println("Failed to parse attendance data");
+                return;
+            }
+
+            data.clearParticipants();// custom metod
+            for (JsonObject obj : doc.as<JsonArray>()) {
+                LectureParticipants p;
+                p.uid = obj["uid"].as<String>();
+                p.name = obj["name"].as<String>();
+                p.uniqueId = obj["uniqueId"].as<String>();
+                p.present = false;
+
+                data.addStudent(p);
+            }
+            data.ready = true;
+        } });
 }
 
 void NetworkManager::loop()
@@ -62,6 +90,7 @@ void NetworkManager::publish(const char *topic, const String &payload)
     }
     else
     {
+
         Serial.println("⚠️ MQTT not connected. Skipping publish.");
     }
 }
@@ -69,4 +98,12 @@ void NetworkManager::publish(const char *topic, const String &payload)
 bool NetworkManager::isConnected() const
 {
     return connected;
+}
+
+void NetworkManager::subscribe(const char *topic)
+{
+    if (connected)
+        mqttClient.subscribe(topic);
+    else
+        Serial.println("⚠️ MQTT not connected. Skipping subscribe.");
 }
