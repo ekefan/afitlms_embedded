@@ -13,6 +13,7 @@ public:
     DisplayManager();
     void begin();
     void showMode(SystemMode mode, bool prompt);
+    void showMessage(const char *msg);
 };
 
 #endif
