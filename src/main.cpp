@@ -1,9 +1,12 @@
+#include <Arduino.h>
 #include "ModeManager.h"
 #include "KeypadManager.h"
 #include "DisplayManager.h"
 #include "RFIDManager.h"
 #include "NetworkManager.h"
 #include "EnrollmentHandler.h"
+#include "AttendanceHandler.h"
+#include "DataStore.h"
 
 #define NETWORK_SSID "_ekefan_"
 #define NETWORK_PASSWORD "88888877"
@@ -12,9 +15,26 @@
 ModeManager modeManager;
 KeypadManager keypadManager;
 DisplayManager displayManager;
+DataStore dataStore;
 RFIDManager rfid(5, 17);                                  // SDA, RST
 NetworkManager network(MQTT_SERVER_IP, MQTT_SERVER_PORT); // Replace with your MQTT broker
 EnrollmentHandler enrollment(rfid, network, displayManager);
+AttendanceHandler attendance(displayManager, rfid, network, dataStore, keypadManager);
+
+void mqttCallBack(char *topic, uint8_t *payload, unsigned int length)
+{
+  String message;
+  for (unsigned int i = 0; i < length; i++)
+  {
+    message += (char)payload[i];
+  }
+
+  if (String(topic) == "attendance/sheet/ekefan01")
+  {
+    // attendance.handleSheetPayload(message);
+    Serial.println("Shitty payload.");
+  }
+}
 
 void setup()
 {
@@ -22,19 +42,27 @@ void setup()
   displayManager.begin();
   displayManager.showMode(modeManager.getMode(), modeManager.isPrompting());
   rfid.begin();
-  displayManager.showMessage("connecting to network");
+  displayManager.setScreen(DisplayScreen::MESSAGE);
+  displayManager.showMessageAtPos(0, 10, "connecting to network");
+  displayManager.clear();
   network.begin(NETWORK_SSID, NETWORK_PASSWORD);
 }
 
 void loop()
 {
-  keypadManager.update(modeManager);
+
+  keypadManager.handleModeChange(modeManager);
   displayManager.showMode(modeManager.getMode(), modeManager.isPrompting());
   network.loop();
-
-  if (modeManager.getMode() == SystemMode::ENROLLMENT)
+  if ((modeManager.getMode() == SystemMode::ENROLLMENT) && !modeManager.isPrompting())
   {
+    displayManager.setScreen(DisplayScreen::ENROLLMENT);
     enrollment.update();
+  }
+  if ((modeManager.getMode() == SystemMode::ATTENDANCE) && !modeManager.isPrompting())
+  {
+    displayManager.setScreen(DisplayScreen::ATTENDANCE_FILTERS);
+    attendance.displayFilters();
   }
   delay(100);
 }

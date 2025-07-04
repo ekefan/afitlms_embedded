@@ -13,7 +13,7 @@ byte colPins[COLS] = {27, 14, 12, 13};
 KeypadManager::KeypadManager()
     : keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS), typedText("") {}
 
-void KeypadManager::update(ModeManager &modeManager)
+void KeypadManager::handleModeChange(ModeManager &modeManager)
 {
     char key = keypad.getKey();
 
@@ -27,11 +27,14 @@ void KeypadManager::update(ModeManager &modeManager)
             }
             else if (key == '#' && typedText == "0")
             {
-                modeManager.requestModeChange(SystemMode::ENROLLMENT);
-            }
-            else if (key == '*' && typedText == "0")
-            {
-                modeManager.requestModeChange(SystemMode::ATTENDANCE);
+
+                SystemMode current = modeManager.getMode();
+                if (current == SystemMode::ATTENDANCE)
+                    modeManager.requestModeChange(SystemMode::ENROLLMENT);
+                else
+                    modeManager.requestModeChange(SystemMode::ATTENDANCE);
+
+                typedText = "";
             }
             else
             {
@@ -50,4 +53,9 @@ void KeypadManager::update(ModeManager &modeManager)
             }
         }
     }
+}
+
+char KeypadManager::getKeyFromKeypad()
+{
+    return keypad.getKey();
 }

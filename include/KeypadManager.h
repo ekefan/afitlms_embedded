@@ -12,7 +12,8 @@ private:
 
 public:
     KeypadManager();
-    void update(ModeManager &modeManager);
+    void handleModeChange(ModeManager &modeManager);
+    char getKeyFromKeypad();
 };
 
 #endif

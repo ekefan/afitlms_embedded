@@ -4,7 +4,8 @@
 enum class SystemMode
 {
     ATTENDANCE,
-    ENROLLMENT
+    ENROLLMENT,
+    NONE,
 };
 
 class ModeManager
