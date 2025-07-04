@@ -16,8 +16,7 @@ struct Student
 class DataStore
 {
 public:
-    std::vector<String> faculties;
-    std::map<String, std::vector<String>> departments;
+    std::vector<String> courseCodes;
     std::vector<Student> attendanceSheet;
 
     DataStore();

@@ -12,6 +12,7 @@ enum class AttendanceState
     SELECT_FACULTY,
     SELECT_LEVEL,
     SELECT_DEPARTMENT,
+    SELECT_COURSE_CODE,
     READY,
     TAKING_ATTENDANCE
 };
@@ -26,10 +27,7 @@ private:
     DataStore &data;
 
     AttendanceState state;
-    int page;
-    int selectedFaculty;
-    int selectedLevel;
-    int selectedDepartment;
+    int selectedCourseCodes;
 
 public:
     AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, KeypadManager &kpm);

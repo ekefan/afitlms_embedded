@@ -1,67 +1,20 @@
 #include "AttendanceHandler.h"
 
 AttendanceHandler::AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, KeypadManager &kpm)
-    : display(d), rfid(r), network(n), data(ds), keypad(kpm), state(AttendanceState::SELECT_FACULTY),
-      page(0), selectedFaculty(-1), selectedLevel(-1), selectedDepartment(-1) {}
+    : display(d), rfid(r), network(n), data(ds), keypad(kpm), state(AttendanceState::SELECT_FACULTY), selectedCourseCodes(-1) {}
 
 void AttendanceHandler::selectCourseFilters(char key)
 {
-    switch (state)
+    if (key >= '1' && key <= '4')
     {
-    case AttendanceState::SELECT_FACULTY:
-        if (key == '9')
+        int index = key - '1';
+        if (index < data.courseCodes.size())
         {
-            page++;
+            selectedCourseCodes = index;
         }
-        else if (key >= '1' && key <= '4')
-        {
-            int index = (key - '1') + page * 4;
-            if (index < data.faculties.size())
-            {
-                selectedFaculty = index;
-                page = 0;
-                state = AttendanceState::SELECT_LEVEL;
-            }
-        }
-        break;
-
-    case AttendanceState::SELECT_LEVEL:
-        if (key >= '1' && key <= '5')
-        {
-            selectedLevel = key - '0';
-            page = 0;
-            state = AttendanceState::SELECT_DEPARTMENT;
-        }
-        break;
-
-    case AttendanceState::SELECT_DEPARTMENT:
-        if (key == '9')
-        {
-            page++;
-        }
-        else if (key >= '1' && key <= '4')
-        {
-            String faculty = data.faculties[selectedFaculty];
-            auto &depts = data.departments[faculty];
-            int index = (key - '1') + page * 4;
-            if (index < depts.size())
-            {
-                selectedDepartment = index;
-                state = AttendanceState::READY;
-
-                // Simulate MQTT request
-                network.publish("attendance/request", "Requesting sheet...");
-                display.showMessage("Ready for attendance");
-            }
-        }
-        break;
-
-    case AttendanceState::READY:
-        state = AttendanceState::TAKING_ATTENDANCE;
-        break;
-
-    default:
-        break;
+        String courseCode = data.courseCodes[selectedCourseCodes];
+        display.setScreen(DisplayScreen::MESSAGE);
+        display.showMessage("Ready to take attendance for lecture");
     }
 }
 
@@ -87,28 +40,15 @@ void AttendanceHandler::checkCard()
 
 void AttendanceHandler::displayFilters()
 {
-    switch (state)
+    data.loadMockData();
+    display.drawTitle("Select Course Code");
+    for (int i = 0; i < 4; i++)
     {
-    case AttendanceState::SELECT_FACULTY:
-    {
-        display.drawTitle("Select Faculty");
-        int start = page * 4;
-        for (int i = 0; i < 4; i++)
+        if (i < data.courseCodes.size())
         {
-            int idx = start + i;
-            if (idx < data.faculties.size())
-            {
-                String label = String(i + 1) + ": " + data.faculties[idx];
-                display.drawLine(i, label);
-            }
+            String label = String(i + 1) + ": " + data.courseCodes[i];
+            display.drawLine(i, label);
         }
-        display.drawFooter("9: Next");
-        selectCourseFilters(keypad.getKeyFromKeypad());
-        break;
     }
-    }
-    if (display.isScreen(DisplayScreen::ATTENDANCE_FILTERS))
-        display.render();
-    else
-        display.clear();
+    selectCourseFilters(keypad.getKeyFromKeypad());
 }

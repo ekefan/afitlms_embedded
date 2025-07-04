@@ -5,11 +5,8 @@ DataStore::DataStore()
     loadMockData();
 }
 
-void DataStore::loadMockData()
-{
-    faculties = {"ENG", "SCI", "ART", "MED", "LAW", "SOC"};
-    departments["ENG"] = {"EEE", "MEC", "CIV", "CHE"};
-    departments["SCI"] = {"PHY", "BIO", "CHM", "CSC"};
+void DataStore::loadMockData(){
+    courseCodes = {"EEE506", "EEE508", "EEE510", "EEE532"};
 
     attendanceSheet = {
         {"a1b2c3", "John Doe", "ENG123", false},
