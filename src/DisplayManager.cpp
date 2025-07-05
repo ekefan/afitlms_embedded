@@ -26,7 +26,7 @@ void DisplayManager::showMode(SystemMode mode, bool prompt)
 
     u8g2.setFont(u8g2_font_ncenB08_tr);
 
-    if (mode == SystemMode::ATTENDANCE)
+    if (mode == SystemMode::ATTENDANCE || mode == SystemMode::TAKING_ATTENDANCE)
     {
         u8g2.drawStr(120, 10, "A");
     }

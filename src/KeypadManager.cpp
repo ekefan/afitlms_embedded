@@ -24,9 +24,9 @@ void KeypadManager::handleModeChange(ModeManager &modeManager)
         {
             if (key == '0')
             {
-                typedText = "0";
+                lastIsZero = true;
             }
-            else if (key == '#' && typedText == "0")
+            else if (key == '#' && lastIsZero)
             {
 
                 SystemMode current = modeManager.getMode();
@@ -34,12 +34,10 @@ void KeypadManager::handleModeChange(ModeManager &modeManager)
                     modeManager.requestModeChange(SystemMode::ENROLLMENT);
                 else
                     modeManager.requestModeChange(SystemMode::ATTENDANCE);
-
-                typedText = "";
             }
             else
             {
-                typedText = "";
+                lastIsZero = false;
             }
         }
         else
@@ -55,9 +53,8 @@ void KeypadManager::handleModeChange(ModeManager &modeManager)
             }
         }
 
-        if (attendance.getState() == AttendanceState::TAKING_ATTENDANCE && !flag)
+        if (!flag && (key >= '1' && key <= '4') && modeManager.getMode() == SystemMode::ATTENDANCE)
         {
-            Serial.print("on start it is...");
             attendance.selectCourseFilters(key);
         }
     }

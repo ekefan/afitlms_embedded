@@ -9,31 +9,16 @@
 
 #define NETWORK_SSID "_ekefan_"
 #define NETWORK_PASSWORD "88888877"
-#define MQTT_SERVER_IP "192.168.149.187" // Your Windows IP
-#define MQTT_SERVER_PORT 1883
+#define HTTP_SERVER_IP "10.92.196.187" // Your Windows IP
+#define HTTP_SERVER_PORT 8000
 ModeManager modeManager;
 DisplayManager displayManager;
 DataStore dataStore;
 RFIDManager rfid(5, 17);                                             // SDA, RST
-NetworkManager network(MQTT_SERVER_IP, MQTT_SERVER_PORT, dataStore); // Replace with your MQTT broker
+NetworkManager network(HTTP_SERVER_IP, HTTP_SERVER_PORT, dataStore); // Replace with your MQTT broker
 EnrollmentHandler enrollment(rfid, network, displayManager);
 AttendanceHandler attendance(displayManager, rfid, network, dataStore, modeManager);
 KeypadManager keypadManager(attendance);
-
-void mqttCallBack(char *topic, uint8_t *payload, unsigned int length)
-{
-  String message;
-  for (unsigned int i = 0; i < length; i++)
-  {
-    message += (char)payload[i];
-  }
-
-  if (String(topic) == "attendance/sheet/ekefan01")
-  {
-    // attendance.handleSheetPayload(message);
-    Serial.println("Shitty payload.");
-  }
-}
 
 void setup()
 {
@@ -51,15 +36,33 @@ void loop()
 {
   keypadManager.handleModeChange(modeManager);
   displayManager.showMode(modeManager.getMode(), modeManager.isPrompting());
-  network.loop();
-  attendance.loop();
+  if (dataStore.ready)
+  {
+    modeManager.setAttendanceModeChange(SystemMode::TAKING_ATTENDANCE);
+    dataStore.ready = false;
+    delay(2000);
+  }
+  if (modeManager.hasAttendanceTimedOut())
+  {
+    Serial.println("⏰ Attendance session timed out.");
+    displayManager.showMessageAtPos(10, 30, "Session expired");
+    delay(3000);
+    network.sendAttendance();
+    dataStore.ready = false;
+    modeManager.setAttendanceModeChange(SystemMode::ATTENDANCE);
+    displayManager.setScreen(DisplayScreen::MESSAGE);
+  }
+  if ((modeManager.getMode() == SystemMode::TAKING_ATTENDANCE) && !modeManager.isPrompting())
+  {
+    attendance.checkCard();
+  }
 
   if ((modeManager.getMode() == SystemMode::ENROLLMENT) && !modeManager.isPrompting())
   {
     displayManager.setScreen(DisplayScreen::ENROLLMENT);
     enrollment.update();
   }
-  if ((modeManager.getMode() == SystemMode::ATTENDANCE) && !modeManager.isPrompting() && !modeManager.isTakingAttendance())
+  if ((modeManager.getMode() == SystemMode::ATTENDANCE) && !modeManager.isPrompting())
   {
     displayManager.setScreen(DisplayScreen::ATTENDANCE_FILTERS);
     attendance.displayFilters();

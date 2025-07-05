@@ -5,15 +5,18 @@ enum class SystemMode
 {
     ATTENDANCE,
     ENROLLMENT,
+    TAKING_ATTENDANCE
 };
 
 class ModeManager
 {
 private:
     SystemMode currentMode;
+    SystemMode requestedMode;
     bool promptActive;
     bool attendanceActive;
-    SystemMode requestedMode;
+    bool takingAttendanceActive;
+    unsigned long attendanceStartTime = 0;
 
 public:
     ModeManager();
@@ -21,9 +24,11 @@ public:
     void requestModeChange(SystemMode newMode);
     void confirmChange(bool accept);
     SystemMode getMode() const;
-    bool isPrompting() const;
-    bool isTakingAttendance() const;
+    bool isPrompting();
+    bool isTakingAttendance();
+    bool isAttendanceActive();
     void setAttendanceModeChange(SystemMode newMode);
+    bool hasAttendanceTimedOut(unsigned long timeout = 30000);
 };
 
 #endif

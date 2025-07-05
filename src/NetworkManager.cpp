@@ -2,14 +2,14 @@
 #include <ArduinoJson.h>
 
 NetworkManager::NetworkManager(const char *server, int port, DataStore &ds)
-    : mqttClient(wifiClient), mqttServer(server), mqttPort(port), data(ds), connected(false) {}
+    : httpServer(server), httpPort(port), data(ds), connected(false) {}
 
 void NetworkManager::begin(const char *ssid, const char *password)
 {
+    Serial.printf("Connecting to Wi-Fi (%s)...\n", ssid);
+
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
-
-    Serial.printf("Connecting to Wi-Fi (%s)...\n", ssid);
 
     unsigned long startTime = millis();
     const unsigned long wifiTimeout = 10000; // 10 seconds
@@ -20,79 +20,75 @@ void NetworkManager::begin(const char *ssid, const char *password)
         Serial.print(".");
     }
 
-    if (WiFi.status() != WL_CONNECTED)
+    if (WiFi.status() == WL_CONNECTED)
     {
-        Serial.println("\n❌ Wi-Fi connection failed.");
-        connected = false;
-        return;
-    }
-
-    Serial.println("\n✅ Wi-Fi connected.");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-
-    mqttClient.setServer(mqttServer, mqttPort);
-
-    // Create unique MQTT client ID using MAC
-    String clientId = "ESP32Client-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-
-    Serial.print("Connecting to MQTT broker... ");
-    if (mqttClient.connect(clientId.c_str()))
-    {
-        Serial.println("✅ connected.");
+        Serial.println("\n✅ Wi-Fi connected.");
+        Serial.print("IP address: ");
+        Serial.println(WiFi.localIP());
         connected = true;
     }
     else
     {
-        Serial.println("❌ failed to connect to MQTT.");
+        Serial.println("\n❌ Wi-Fi connection failed.");
         connected = false;
     }
-
-    mqttClient.setCallback([this](char *topic, byte *payload, unsigned int length)
-                           {
-        String message;
-        for (unsigned int i = 0; i < length; i++){
-            message += (char)payload[i];
-        } 
-        if (String(topic).startsWith("attendance/response/")) {
-            JsonDocument doc = StaticJsonDocument<1024>();
-            DeserializationError err = deserializeJson(doc, message);
-            if (err) {
-                Serial.println("Failed to parse attendance data");
-                return;
-            }
-
-            data.clearParticipants();// custom metod
-            for (JsonObject obj : doc.as<JsonArray>()) {
-                LectureParticipants p;
-                p.uid = obj["uid"].as<String>();
-                p.name = obj["name"].as<String>();
-                p.uniqueId = obj["uniqueId"].as<String>();
-                p.present = false;
-
-                data.addStudent(p);
-            }
-            data.ready = true;
-        } });
 }
 
-void NetworkManager::loop()
+bool NetworkManager::fetchAttendance(const String &courseCode)
 {
-    if (connected)
-        mqttClient.loop();
-}
-
-void NetworkManager::publish(const char *topic, const String &payload)
-{
-    if (connected)
+    if (!connected)
     {
-        mqttClient.publish(topic, payload.c_str());
+        Serial.println("❌ Not connected to WiFi.");
+        return false;
+    }
+
+    HTTPClient http;
+    String url = "http://" + String(httpServer) + ":" + String(httpPort) + "/attendance/request/" + String(courseCode);
+
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+    Serial.printf("📤 Sending request to %s\n", url.c_str());
+
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode >= 200 && httpResponseCode < 300)
+    {
+        currentCourseCode = courseCode;
+        String response = http.getString();
+        Serial.println("✅ Response received");
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, response);
+
+        if (err)
+        {
+            Serial.println("❌ Failed to parse response JSON:");
+            Serial.println(err.c_str());
+            http.end();
+            return false;
+        }
+
+        data.clearParticipants();
+        for (JsonObject obj : doc.as<JsonArray>())
+        {
+            LectureParticipants p;
+            p.uid = obj["uid"].as<String>();
+            p.name = obj["name"].as<String>();
+            p.uniqueId = obj["uniqueId"].as<String>();
+            p.present = false;
+            data.addStudent(p);
+        }
+
+        data.ready = true;
+        http.end();
+        return true;
     }
     else
     {
-
-        Serial.println("⚠️ MQTT not connected. Skipping publish.");
+        Serial.printf("❌ HTTP Error code: %d\n", httpResponseCode);
+        http.end();
+        return false;
     }
+    return false;
 }
 
 bool NetworkManager::isConnected() const
@@ -100,10 +96,40 @@ bool NetworkManager::isConnected() const
     return connected;
 }
 
-void NetworkManager::subscribe(const char *topic)
+bool NetworkManager::sendAttendance()
 {
-    if (connected)
-        mqttClient.subscribe(topic);
+    if (!connected)
+    {
+        Serial.println("❌ Not connected to WiFi.");
+        return false;
+    }
+
+    HTTPClient http;
+    String url = "http://" + String(httpServer) + ":" + String(httpPort) + "/attendance/response/" + currentCourseCode;
+
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+    Serial.printf("📤 Sending request to %s\n", url.c_str());
+
+    String jsonPayload;
+
+    DynamicJsonDocument doc(2048); // over-allocate slightly
+
+    JsonArray participants = doc.to<JsonArray>();
+    serializeJson(participants, jsonPayload);
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode > 0)
+    {
+        Serial.printf("✅ Attendance sent! HTTP %d\n", httpResponseCode);
+        http.end();
+        return true;
+    }
     else
-        Serial.println("⚠️ MQTT not connected. Skipping subscribe.");
+    {
+        Serial.printf("❌ Failed to send attendance. Error code: %d\n", httpResponseCode);
+        http.end();
+        return false;
+    }
+    return false;
 }

@@ -30,8 +30,6 @@ public:
     void checkCard();
     AttendanceState getState();
     void displayFilters();
-    void loop();
-    void fetchAttendanceData();
 };
 
 #endif

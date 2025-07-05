@@ -1,7 +1,6 @@
 #include "AttendanceHandler.h"
 
 const char *ATTENDANCE_REQUEST_TOPIC = "attendance/request";
-String ATTENDANCE_RESPONSE_TOPIC_PREFIX = "attendance/response/";
 
 AttendanceHandler::AttendanceHandler(DisplayManager &d, RFIDManager &r, NetworkManager &n, DataStore &ds, ModeManager &mm)
     : display(d), rfid(r), network(n), data(ds), mode(mm), state(AttendanceState::SELECT_COURSE_CODE), selectedCourseCodes(-1) {}
@@ -18,14 +17,27 @@ void AttendanceHandler::selectCourseFilters(char key)
         String courseCode = data.courseCodes[selectedCourseCodes];
         display.setScreen(DisplayScreen::MESSAGE);
         display.showMessage("Ready for attendance");
-        delay(2000);
+        delay(1000);
         display.showMessageAtPos(30, 45, courseCode.c_str());
-        fetchAttendanceData();
+        delay(2000);
+        if (network.fetchAttendance(courseCode))
+        {
+            display.showMessageAtPos(30, 45, "Starting");
+            delay(2000);
+            display.showMessageAtPos(30, 45, "Scan your cards");
+            state = AttendanceState::TAKING_ATTENDANCE;
+        }
+        else
+        {
+            display.showMessageAtPos(10, 45, "No lecture data");
+            delay(2000);
+        }
     }
 }
 
 void AttendanceHandler::checkCard()
 {
+
     if (state == AttendanceState::TAKING_ATTENDANCE && rfid.isCardPresent())
     {
         String uid = rfid.readUID();
@@ -33,14 +45,17 @@ void AttendanceHandler::checkCard()
         if (student)
         {
             data.markPresent(uid);
-            display.clear();
+            Serial.println(student->name);
             display.showMessage((student->name + " " + student->uniqueId).c_str());
+            student->present = true;
             delay(1500);
         }
         else
         {
             display.showMessage("Unknown card");
-            delay(3000);
+            delay(500);
+            display.clear();
+            display.showMessageAtPos(30, 45, "Scan your cards");
         }
     }
 }
@@ -63,36 +78,4 @@ void AttendanceHandler::displayFilters()
 AttendanceState AttendanceHandler::getState()
 {
     return state;
-}
-
-void AttendanceHandler::fetchAttendanceData()
-{
-    String courseCode = data.courseCodes[selectedCourseCodes];
-    String responseTopic = ATTENDANCE_RESPONSE_TOPIC_PREFIX + courseCode;
-
-    network.publish(ATTENDANCE_REQUEST_TOPIC, courseCode);
-
-    network.subscribe(responseTopic.c_str());
-
-    display.setScreen(DisplayScreen::MESSAGE);
-    display.showMessageAtPos(30, 45, "Fetching data...");
-    delay(5000);
-
-    state = AttendanceState::WAITING_FOR_ATTENDANCE_DATA;
-}
-
-void AttendanceHandler::loop()
-{
-    if (state == AttendanceState::WAITING_FOR_ATTENDANCE_DATA && data.ready)
-    {
-        display.clear();
-        display.showMessageAtPos(30, 45, "Scan your cards");
-        delay(2000);
-        state = AttendanceState::TAKING_ATTENDANCE;
-    }
-
-    if (state == AttendanceState::TAKING_ATTENDANCE)
-    {
-        checkCard();
-    }
 }

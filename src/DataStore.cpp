@@ -9,9 +9,7 @@ void DataStore::loadMockData()
 {
     courseCodes = {"EEE506", "EEE508", "EEE510", "EEE532"};
 
-    participants = {
-        {"a1b2c3", "John Doe", "ENG123", false},
-        {"d4e5f6", "Jane Smith", "SCI456", false}};
+    participants = {};
 }
 
 void DataStore::markPresent(const String &uid)

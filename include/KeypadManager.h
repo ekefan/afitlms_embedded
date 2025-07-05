@@ -10,6 +10,7 @@ class KeypadManager
 private:
     Keypad keypad;
     String typedText;
+    bool lastIsZero;
     AttendanceHandler &attendance;
 
 public:
